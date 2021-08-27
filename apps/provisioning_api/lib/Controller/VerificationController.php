@@ -74,6 +74,26 @@ class VerificationController extends Controller {
 
 	/**
 	 * @NoCSRFRequired
+	 * @NoAdminRequired
+	 * @NoSubAdminRequired
+	 */
+	public function showVerifyMail(string $token, string $userId, string $key) {
+		if ($this->userSession->getUser()->getUID() !== $userId) {
+			throw new InvalidArgumentException('Logged in user is not mail address owner');
+		}
+		$email = $this->crypto->decrypt($key);
+
+		return new TemplateResponse(
+			'core', 'confirmation', [
+				'title' => $this->l10n->t('Email confirmation'),
+				'message' => $this->l10n->t('To enable the email address %s please click the button below.', [$email]),
+				'action' => $this->l10n->t('Confirm'),
+			], 'guest');
+	}
+
+	/**
+	 * @NoAdminRequired
+	 * @NoSubAdminRequired
 	 */
 	public function verifyMail(string $token, string $userId, string $key) {
 		try {
@@ -95,6 +115,7 @@ class VerificationController extends Controller {
 			}
 			$emailProperty->setLocallyVerified(IAccountManager::VERIFIED);
 			$this->accountManager->updateAccount($userAccount);
+			$this->verificationToken->delete($token, $user, 'verifyMail' . $ref);
 		} catch (InvalidTokenException $e) {
 			$error = $e->getCode() === InvalidTokenException::TOKEN_EXPIRED
 				? $this->l10n->t('Could not verify mail because the token is expired.')
